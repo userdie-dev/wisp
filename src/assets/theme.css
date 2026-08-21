@@ -1,0 +1,25 @@
+/* Design tokens — see docs/features/theme-settings.md. Values only; mapped to
+   Tailwind utilities (`bg-surface`, `text-fg`, ...) via the `@theme` block in
+   src/style.css so components never hardcode colors. */
+
+:root {
+  --surface: #f5f5f7;
+  --surface-chrome: rgb(255 255 255 / 0.55);
+  --surface-chrome-hover: rgb(255 255 255 / 0.8);
+  --fg: #1c1c1e;
+  --fg-muted: #6b6b70;
+  --border: rgb(0 0 0 / 0.08);
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+}
+
+.dark {
+  --surface: #1c1c1e;
+  --surface-chrome: rgb(20 20 22 / 0.5);
+  --surface-chrome-hover: rgb(40 40 44 / 0.75);
+  --fg: #f2f2f3;
+  --fg-muted: #9b9ba1;
+  --border: rgb(255 255 255 / 0.1);
+  --accent: #3b82f6;
+  --accent-fg: #0b1220;
+}

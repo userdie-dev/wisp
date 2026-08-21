@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Rust build output — never produced locally (see docs/setup-and-build.md),
+# but ignore it in case CI artifacts are ever copied back for inspection.
+src-tauri/target/
+src-tauri/gen/
+
+*.log
+*.tsbuildinfo
+.DS_Store

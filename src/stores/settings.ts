@@ -1,0 +1,83 @@
+import { defineStore } from 'pinia'
+import { ref, watch, watchEffect } from 'vue'
+import { openPersistedStore, type PersistedStore } from '@/lib/persisted-store'
+import { BUILT_IN_SEARCH_ENGINES, type SearchEngine } from '@/lib/search-engines'
+
+export type Theme = 'system' | 'light' | 'dark'
+
+let storePromise: Promise<PersistedStore> | null = null
+function settingsStore(): Promise<PersistedStore> {
+  return (storePromise ??= openPersistedStore('settings.json'))
+}
+
+export const useSettingsStore = defineStore('settings', () => {
+  const theme = ref<Theme>('system')
+  const searchEngineId = ref<string>('google')
+  const customSearchEngines = ref<SearchEngine[]>([])
+  const ready = ref(false)
+
+  const systemPrefersDark = ref(
+    typeof matchMedia !== 'undefined' ? matchMedia('(prefers-color-scheme: dark)').matches : false,
+  )
+  if (typeof matchMedia !== 'undefined') {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      systemPrefersDark.value = e.matches
+    })
+  }
+
+  async function load() {
+    const store = await settingsStore()
+    theme.value = (await store.get<Theme>('theme')) ?? 'system'
+    searchEngineId.value = (await store.get<string>('searchEngineId')) ?? 'google'
+    customSearchEngines.value = (await store.get<SearchEngine[]>('customSearchEngines')) ?? []
+    ready.value = true
+  }
+  load()
+
+  watch(theme, async (value) => {
+    if (!ready.value) return
+    ;(await settingsStore()).set('theme', value)
+  })
+  watch(
+    customSearchEngines,
+    async (value) => {
+      if (!ready.value) return
+      ;(await settingsStore()).set('customSearchEngines', value)
+    },
+    { deep: true },
+  )
+  watch(searchEngineId, async (value) => {
+    if (!ready.value) return
+    ;(await settingsStore()).set('searchEngineId', value)
+  })
+
+  watchEffect(() => {
+    const isDark = theme.value === 'dark' || (theme.value === 'system' && systemPrefersDark.value)
+    document.documentElement.classList.toggle('dark', isDark)
+  })
+
+  const allSearchEngines = () => [...BUILT_IN_SEARCH_ENGINES, ...customSearchEngines.value]
+
+  function activeSearchEngine(): SearchEngine {
+    return allSearchEngines().find((e) => e.id === searchEngineId.value) ?? BUILT_IN_SEARCH_ENGINES[0]
+  }
+
+  function addCustomSearchEngine(engine: SearchEngine) {
+    customSearchEngines.value.push(engine)
+  }
+
+  function removeCustomSearchEngine(id: string) {
+    customSearchEngines.value = customSearchEngines.value.filter((e) => e.id !== id)
+    if (searchEngineId.value === id) searchEngineId.value = 'google'
+  }
+
+  return {
+    theme,
+    searchEngineId,
+    customSearchEngines,
+    allSearchEngines,
+    activeSearchEngine,
+    addCustomSearchEngine,
+    removeCustomSearchEngine,
+  }
+})

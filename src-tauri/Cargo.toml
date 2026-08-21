@@ -1,0 +1,25 @@
+[package]
+name = "browser"
+version = "0.1.0"
+description = "Desktop browser shell built on Tauri's system webviews (WebView2/V8 on Windows, WebKit elsewhere)"
+edition = "2021"
+
+[lib]
+# Needed so `tauri::generate_context!` and friends can be exercised from
+# integration tests later without duplicating the crate; not otherwise load-bearing.
+name = "browser_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["unstable", "macos-private-api"] }
+tauri-plugin-store = "2"
+window-vibrancy = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+
+# `unstable` is required for Window::add_child (multiwebview), which the tab
+# model depends on end-to-end — see docs/architecture.md.
