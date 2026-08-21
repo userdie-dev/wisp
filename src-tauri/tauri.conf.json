@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "browser",
+  "productName": "wisp",
   "version": "0.1.0",
-  "identifier": "com.vadimov.browser",
+  "identifier": "com.vadimov.wisp",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Browser",
+        "title": "Wisp",
         "width": 1200,
         "height": 800,
         "minWidth": 640,

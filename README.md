@@ -1,4 +1,4 @@
-# Browser
+# Wisp
 
 Десктопный браузер на Tauri, использующий системные веб-вью (WebView2/V8 на Windows, WebKit на macOS/Linux). UI — Vue 3.6 (частично vue-vapor) + Reka UI + Tailwind CSS.
 
