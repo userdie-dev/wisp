@@ -71,6 +71,7 @@ export const useTabsStore = defineStore('tabs', () => {
     if (!isTauri()) return
     if (wasPending) {
       await invoke('tabs_create', { id, url })
+      await invoke('tabs_activate', { id })
     } else {
       await invoke('tabs_navigate', { id, url })
     }

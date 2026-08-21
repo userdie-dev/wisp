@@ -61,7 +61,10 @@ describe('tabs store', () => {
       expect(invokeMock).not.toHaveBeenCalled()
     })
 
-    it('invokes tabs_create for a pending tab\'s first navigation inside Tauri', async () => {
+    it('invokes tabs_create then tabs_activate for a pending tab\'s first navigation inside Tauri', async () => {
+      // Regression test: tabs_create alone leaves the new webview hidden
+      // (Rust creates it hidden and expects an explicit activate) — without
+      // the follow-up tabs_activate call, the content area stays blank.
       isTauriMock.mockReturnValue(true)
       const store = useTabsStore()
       const id = await store.createTab()
@@ -70,6 +73,7 @@ describe('tabs store', () => {
       await store.navigate(id, 'https://example.com')
 
       expect(invokeMock).toHaveBeenCalledWith('tabs_create', { id, url: 'https://example.com' })
+      expect(invokeMock).toHaveBeenCalledWith('tabs_activate', { id })
       expect(store.tabs.find((t) => t.id === id)?.pending).toBe(false)
     })
 
