@@ -23,25 +23,26 @@ pnpm dev
 
 Workflow `.github/workflows/build.yml`:
 
-- триггерится на `push` в `main`, на pull request (только `cargo check` + фронтенд build, без паблиша) и на тег `v*` (полная сборка + релиз).
+- триггерится на `push` в `main`, на pull request (только тесты + `cargo check` + фронтенд build, без паблиша) и на тег `v*` (полная сборка + релиз).
 - матрица ОС: `windows-latest`, `macos-latest`, `ubuntu-latest` — получаем нативные бинарники под все три платформы одним прогоном.
 - использует официальный `tauri-apps/tauri-action`, который сам ставит Rust-тулчейн и системные зависимости (WebView2 на Windows уже есть в раннере, `libwebkit2gtk` на Linux ставится шагом `apt-get`) — на раннере GitHub, не на машине разработчика.
-- на тег `vX.Y.Z` publish создаёт GitHub Release с артефактами (`.msi`/`.exe` для Windows, `.dmg`/`.app` для macOS, `.deb`/`.AppImage` для Linux).
+- на тег `vX.Y.Z` publish создаёт **versioned** GitHub Release (draft) с артефактами (`.msi`/`.exe` для Windows, `.dmg`/`.app` для macOS, `.deb`/`.AppImage` для Linux).
+- на каждый `push` в `main` (после `check`) job'ы `nightly-reset` + `nightly` пересобирают и публикуют те же артефакты в один и тот же **rolling pre-release** с тегом `nightly` — `nightly-reset` сначала удаляет предыдущий релиз/тег (`gh release delete nightly --cleanup-tag`), чтобы три параллельные сборки матрицы не гонялись за созданием тега. Это отдельный путь от версионных релизов по тегу `v*` выше — `nightly` не версионируется и всегда отражает последний коммит в `main`.
 
-Как выпустить сборку:
+Как выпустить версионную сборку:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Это единственный способ получить установочные файлы — сборка **runs on GitHub, never locally**.
+Это единственный способ получить **версионные** установочные файлы — сборка **runs on GitHub, never locally**. Для сборки под текущий `main` без тега смотри GitHub Release с тегом `nightly` — он обновляется автоматически при каждом push.
 
-## Проверка на PR
+## Проверка на PR / push
 
-На pull request'ах workflow гоняет:
+Job `check` гоняет на каждый `push` и pull request:
 
-1. `pnpm install && pnpm build` — проверка, что фронтенд собирается и типы (`vue-tsc`) проходят.
+1. `pnpm install && pnpm test && pnpm build` — юнит-тесты (Vitest, `src/**/*.test.ts`) и проверка, что фронтенд собирается и типы (`vue-tsc`) проходят.
 2. `cargo check --manifest-path src-tauri/Cargo.toml` — проверка, что Rust-код компилируется, без полной сборки бандла (быстрее).
 
-Это заменяет локальную проверку `cargo build`, которую разработчик выполнить не может.
+Это заменяет локальную проверку `pnpm test`/`cargo build`, которую разработчик может (тесты) или не может (`cargo build`) выполнить сам — юнит-тесты можно и нужно гонять локально (`pnpm test`) перед пушем, `cargo check` — только на CI.

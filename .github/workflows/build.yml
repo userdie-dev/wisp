@@ -32,6 +32,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm test
       - run: pnpm build
 
       - uses: dtolnay/rust-toolchain@stable
@@ -89,3 +90,68 @@ jobs:
           releaseName: 'Browser ${{ github.ref_name }}'
           releaseDraft: true
           prerelease: false
+
+  # Rolling pre-release rebuilt on every push to main once `check` passes —
+  # separate from the tag-triggered `release` job above, which stays the
+  # versioned release path. `nightly-reset` deletes the previous tag/release
+  # first so the three platform builds below don't race to create it.
+  nightly-reset:
+    name: Reset nightly release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Delete previous nightly release and tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete nightly --yes --cleanup-tag || true
+
+  nightly:
+    name: Nightly build (${{ matrix.platform }})
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: nightly-reset
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux webview dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: nightly
+          releaseName: 'Wisp nightly'
+          releaseBody: 'Automated build from main @ ${{ github.sha }}. Not a stable release.'
+          releaseDraft: false
+          prerelease: true
