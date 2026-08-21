@@ -13,10 +13,13 @@ const bookmarks = useBookmarksStore()
 const activeTab = computed(() => tabs.tabs.find((t) => t.id === tabs.activeTabId) ?? null)
 const omniboxValue = ref('')
 
+// Watches the tab id *and* its url — a plain `watch(activeTab, ...)` would
+// miss url changes on the same tab object (e.g. navigating away from the
+// start page), since the computed's object reference doesn't change.
 watch(
-  activeTab,
-  (tab) => {
-    omniboxValue.value = tab?.url ?? ''
+  () => [activeTab.value?.id, activeTab.value?.url] as const,
+  ([, url]) => {
+    omniboxValue.value = url ?? ''
   },
   { immediate: true },
 )

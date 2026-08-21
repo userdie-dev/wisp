@@ -65,11 +65,12 @@ export const useTabsStore = defineStore('tabs', () => {
     if (!tab) return
     tab.url = url
     tab.loading = true
+    const wasPending = tab.pending
+    tab.pending = false // clears the start page regardless of Tauri availability
 
     if (!isTauri()) return
-    if (tab.pending) {
+    if (wasPending) {
       await invoke('tabs_create', { id, url })
-      tab.pending = false
     } else {
       await invoke('tabs_navigate', { id, url })
     }
