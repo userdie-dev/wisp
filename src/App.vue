@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import Sidebar from '@/components/sidebar/Sidebar.vue'
 import Toolbar from '@/components/chrome/Toolbar.vue'
 import ContentHost from '@/components/chrome/ContentHost.vue'
+import WindowControls from '@/components/chrome/WindowControls.vue'
 import { useTabsStore } from '@/stores/tabs'
 
 const tabs = useTabsStore()
@@ -19,5 +20,6 @@ onMounted(() => {
       <Toolbar />
       <ContentHost />
     </div>
+    <WindowControls />
   </div>
 </template>
