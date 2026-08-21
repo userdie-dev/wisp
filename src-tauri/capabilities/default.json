@@ -3,5 +3,12 @@
   "identifier": "default",
   "description": "Capabilities for the main window: core window/app APIs plus the store plugin used directly from the frontend for history/bookmarks/settings.",
   "windows": ["main"],
-  "permissions": ["core:default", "store:default"]
+  "permissions": [
+    "core:default",
+    "store:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized"
+  ]
 }
