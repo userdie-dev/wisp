@@ -43,9 +43,13 @@ function toggleBookmark() {
 </script>
 
 <template>
-  <div v-if="activeTab" class="titlebar-drag flex h-12 shrink-0 items-center gap-1 bg-surface-chrome px-3 backdrop-blur-xl">
+  <div
+    v-if="activeTab"
+    data-tauri-drag-region
+    class="flex h-12 shrink-0 items-center gap-1 bg-surface-chrome px-3 backdrop-blur-xl"
+  >
     <button
-      class="titlebar-no-drag rounded p-1.5 hover:bg-fg/10 disabled:opacity-30"
+      class="rounded p-1.5 hover:bg-fg/10 disabled:opacity-30"
       :disabled="!activeTab"
       title="Назад"
       @click="tabs.goBack(activeTab!.id)"
@@ -53,7 +57,7 @@ function toggleBookmark() {
       <ArrowLeft :size="16" />
     </button>
     <button
-      class="titlebar-no-drag rounded p-1.5 hover:bg-fg/10 disabled:opacity-30"
+      class="rounded p-1.5 hover:bg-fg/10 disabled:opacity-30"
       :disabled="!activeTab"
       title="Вперёд"
       @click="tabs.goForward(activeTab!.id)"
@@ -61,7 +65,7 @@ function toggleBookmark() {
       <ArrowRight :size="16" />
     </button>
     <button
-      class="titlebar-no-drag rounded p-1.5 hover:bg-fg/10 disabled:opacity-30"
+      class="rounded p-1.5 hover:bg-fg/10 disabled:opacity-30"
       :disabled="!activeTab"
       title="Обновить"
       @click="tabs.reload(activeTab!.id)"
@@ -71,13 +75,13 @@ function toggleBookmark() {
 
     <input
       v-model="omniboxValue"
-      class="titlebar-no-drag mx-2 h-8 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-accent"
+      class="mx-2 h-8 flex-1 rounded-md border border-border bg-surface px-3 text-sm text-fg outline-none focus:border-accent"
       placeholder="Поиск или адрес сайта"
       @keydown.enter="submitOmnibox"
     />
 
     <button
-      class="titlebar-no-drag rounded p-1.5 hover:bg-fg/10"
+      class="rounded p-1.5 hover:bg-fg/10"
       :class="bookmarked ? 'text-accent' : ''"
       title="Добавить в закладки"
       @click="toggleBookmark"

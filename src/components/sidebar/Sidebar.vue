@@ -12,9 +12,10 @@ function newTab() {
 
 <template>
   <aside
-    class="titlebar-drag flex h-full w-[260px] shrink-0 flex-col bg-surface-chrome pt-8 backdrop-blur-xl"
+    data-tauri-drag-region
+    class="flex h-full w-[260px] shrink-0 flex-col bg-surface-chrome pt-8 backdrop-blur-xl"
   >
-    <div class="titlebar-no-drag flex items-center justify-between px-3 pb-2">
+    <div class="flex items-center justify-between px-3 pb-2">
       <span class="text-xs font-medium text-fg-muted">Вкладки</span>
       <button
         class="rounded p-1 hover:bg-fg/10"
@@ -26,7 +27,7 @@ function newTab() {
       </button>
     </div>
 
-    <div class="titlebar-no-drag flex-1 space-y-0.5 overflow-y-auto px-2">
+    <div class="flex-1 space-y-0.5 overflow-y-auto px-2">
       <TabItem
         v-for="tab in tabs.tabs"
         :key="tab.id"
@@ -37,7 +38,7 @@ function newTab() {
       />
     </div>
 
-    <div class="titlebar-no-drag flex items-center justify-around border-t border-border px-2 py-2">
+    <div class="flex items-center justify-around border-t border-border px-2 py-2">
       <button
         class="rounded p-2 hover:bg-fg/10"
         :class="{ 'text-accent': tabs.activeInternalPage === 'history' }"

@@ -12,7 +12,7 @@
 }
 ```
 
-- `decorations: false` — убираем нативную рамку/заголовок, рисуем свой drag-region в CSS (`-webkit-app-region: drag` на верхней полосе сайдбара) — так принято в кастомных прозрачных окнах Tauri.
+- `decorations: false` — убираем нативную рамку/заголовок, рисуем свой drag-region через атрибут `data-tauri-drag-region` на корневых элементах тулбара и сайдбара (требует разрешения `core:window:allow-start-dragging` в `capabilities/default.json`). **Не** через CSS `-webkit-app-region: drag` — на Windows/WebView2 вложенные "no-drag" элементы (кнопки, инпут омнибокса, кнопки управления окном) ненадёжно исключаются из drag-региона и перестают получать клики в собранном приложении, хотя в браузере при `pnpm dev` и на macOS (WKWebView) всё работало. `data-tauri-drag-region` — обычный DOM-обработчик mousedown на точном элементе, а не OS-level hit-testing, поэтому этой проблемы не имеет ни на одной платформе.
 - `titleBarStyle: "Overlay"` — на macOS оставляет системные traffic-light кнопки поверх нашего контента (нужно отступить от них в CSS сайдбара: `padding-top` с учётом `env(titlebar-area-height)` / фиксированные ~28px).
 - `transparent: true` на macOS требует ещё двух вещей, без них прозрачность не включится: `"macOSPrivateApi": true` в `app` (не только в `windows[]`) и Cargo-фича `macos-private-api` на зависимости `tauri` (`src-tauri/Cargo.toml`) — уже настроено в этом проекте.
 

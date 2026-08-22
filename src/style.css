@@ -36,10 +36,7 @@ body {
 }
 
 /* Custom titlebar drag region — window has native decorations disabled
-   (see docs/features/window-transparency.md). */
-.titlebar-drag {
-  -webkit-app-region: drag;
-}
-.titlebar-no-drag {
-  -webkit-app-region: no-drag;
-}
+   (see docs/features/window-transparency.md). Dragging is wired via the
+   `data-tauri-drag-region` attribute in markup, not `-webkit-app-region`:
+   that CSS property is unreliable on Windows/WebView2 (nested "no-drag"
+   buttons can still swallow clicks), even though it works fine on macOS. */

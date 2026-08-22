@@ -23,7 +23,7 @@ const emit = defineEmits<{ select: []; close: [] }>()
     </span>
 
     <button
-      class="titlebar-no-drag hidden shrink-0 rounded p-0.5 hover:bg-fg/10 group-hover:block"
+      class="hidden shrink-0 rounded p-0.5 hover:bg-fg/10 group-hover:block"
       :class="{ block: active }"
       @click.stop="emit('close')"
       aria-label="Закрыть вкладку"
