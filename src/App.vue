@@ -17,9 +17,11 @@ onMounted(() => {
   <div class="flex h-screen w-screen overflow-hidden bg-transparent">
     <Sidebar />
     <div class="flex min-w-0 flex-1 flex-col">
-      <Toolbar />
+      <div class="flex h-12 shrink-0">
+        <Toolbar class="min-w-0 flex-1" />
+        <WindowControls />
+      </div>
       <ContentHost />
     </div>
-    <WindowControls />
   </div>
 </template>
