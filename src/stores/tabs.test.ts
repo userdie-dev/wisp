@@ -15,6 +15,7 @@ describe('tabs store', () => {
     setActivePinia(createPinia())
     isTauriMock.mockReturnValue(false)
     invokeMock.mockClear()
+    localStorage.clear()
   })
 
   describe('createTab', () => {
@@ -117,6 +118,105 @@ describe('tabs store', () => {
       await store.closeTab(id)
 
       expect(invokeMock).not.toHaveBeenCalledWith('tabs_close', expect.anything())
+    })
+  })
+
+  describe('restoreSession', () => {
+    function seedSession(session: unknown) {
+      localStorage.setItem('session.json:session', JSON.stringify(session))
+    }
+
+    it('restores saved tabs and the saved active tab by default', async () => {
+      seedSession({
+        tabs: [
+          { id: 'a', url: 'https://a.test', title: 'A', favicon: null, pending: false, createdAt: 1 },
+          { id: 'b', url: '', title: 'Новая вкладка', favicon: null, pending: true, createdAt: 2 },
+        ],
+        activeTabId: 'a',
+      })
+      const store = useTabsStore()
+
+      await store.restoreSession()
+
+      expect(store.tabs.map((t) => t.id)).toEqual(['a', 'b'])
+      expect(store.activeTabId).toBe('a')
+      expect(store.ready).toBe(true)
+      // Restored non-pending tab has no webview yet.
+      expect(store.tabs.find((t) => t.id === 'a')?.unloaded).toBe(true)
+      expect(store.tabs.find((t) => t.id === 'b')?.unloaded).toBe(false)
+    })
+
+    it('falls back to the last tab when the saved active id is gone', async () => {
+      seedSession({
+        tabs: [
+          { id: 'a', url: 'https://a.test', title: 'A', favicon: null, pending: false, createdAt: 1 },
+        ],
+        activeTabId: 'missing',
+      })
+      const store = useTabsStore()
+
+      await store.restoreSession()
+
+      expect(store.activeTabId).toBe('a')
+    })
+
+    it('does not restore when startupBehavior is newTab', async () => {
+      localStorage.setItem('settings.json:startupBehavior', JSON.stringify('newTab'))
+      seedSession({
+        tabs: [
+          { id: 'a', url: 'https://a.test', title: 'A', favicon: null, pending: false, createdAt: 1 },
+        ],
+        activeTabId: 'a',
+      })
+      const store = useTabsStore()
+
+      await store.restoreSession()
+
+      expect(store.tabs).toHaveLength(0)
+      expect(store.ready).toBe(true)
+    })
+
+    it('is a no-op with an empty saved session', async () => {
+      const store = useTabsStore()
+      await store.restoreSession()
+      expect(store.tabs).toHaveLength(0)
+      expect(store.ready).toBe(true)
+    })
+
+    it('persists the session after restore completes', async () => {
+      const store = useTabsStore()
+      await store.restoreSession()
+      await store.createTab('https://a.test')
+
+      await new Promise((r) => setTimeout(r))
+      const saved = JSON.parse(localStorage.getItem('session.json:session') ?? '{}')
+      expect(saved.tabs.map((t: { url: string }) => t.url)).toEqual(['https://a.test'])
+      expect(saved.activeTabId).toBe(store.activeTabId)
+    })
+
+    it('lazily creates the native webview when a restored tab is first activated', async () => {
+      seedSession({
+        tabs: [
+          { id: 'a', url: 'https://a.test', title: 'A', favicon: null, pending: false, createdAt: 1 },
+          { id: 'b', url: 'https://b.test', title: 'B', favicon: null, pending: false, createdAt: 2 },
+        ],
+        activeTabId: 'a',
+      })
+      const store = useTabsStore()
+      await store.restoreSession()
+
+      isTauriMock.mockReturnValue(true)
+      invokeMock.mockClear()
+
+      await store.activateTab('b')
+
+      expect(invokeMock).toHaveBeenCalledWith('tabs_create', { id: 'b', url: 'https://b.test' })
+      expect(invokeMock).toHaveBeenCalledWith('tabs_activate', { id: 'b' })
+      expect(store.tabs.find((t) => t.id === 'b')?.unloaded).toBe(false)
+
+      invokeMock.mockClear()
+      await store.activateTab('b')
+      expect(invokeMock).not.toHaveBeenCalledWith('tabs_create', expect.anything())
     })
   })
 })

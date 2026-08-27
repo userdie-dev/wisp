@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { nanoid } from 'nanoid'
 import { isTauri } from '@/lib/tauri-env'
+import { openPersistedStore, type PersistedStore } from '@/lib/persisted-store'
+import { useSettingsStore } from '@/stores/settings'
 
 export interface Tab {
   id: string
@@ -13,6 +15,27 @@ export interface Tab {
   /** True for a freshly-opened tab with no page loaded yet — no Rust-side
    * webview exists until the first navigation, see docs/features/tabs.md. */
   pending: boolean
+  /** True for a session-restored tab whose native webview hasn't been created
+   * yet — created lazily on first activation. See docs/features/session-restore.md. */
+  unloaded?: boolean
+}
+
+interface SavedTab {
+  id: string
+  url: string
+  title: string
+  favicon: string | null
+  pending: boolean
+  createdAt: number
+}
+interface SavedSession {
+  tabs: SavedTab[]
+  activeTabId: string | null
+}
+
+let sessionStorePromise: Promise<PersistedStore> | null = null
+function sessionStore(): Promise<PersistedStore> {
+  return (sessionStorePromise ??= openPersistedStore('session.json'))
 }
 
 export type InternalPage = 'history' | 'bookmarks' | 'settings' | null
@@ -26,6 +49,8 @@ export const useTabsStore = defineStore('tabs', () => {
   const tabs = ref<Tab[]>([])
   const activeTabId = ref<string | null>(null)
   const activeInternalPage = ref<InternalPage>(null)
+  /** Flips to true once session restore has finished; gates session autosave. */
+  const ready = ref(false)
 
   if (isTauri()) {
     import('@tauri-apps/api/event').then(({ listen }) => {
@@ -38,6 +63,57 @@ export const useTabsStore = defineStore('tabs', () => {
       })
     })
   }
+
+  /** Restore last session's tabs, or not, per the `startupBehavior` setting.
+   * Called once from App.vue before the "no tabs → open one" fallback.
+   * See docs/features/session-restore.md. */
+  async function restoreSession(): Promise<void> {
+    try {
+      const settings = useSettingsStore()
+      await settings.loaded
+      if (settings.startupBehavior === 'restore') {
+        const saved = await (await sessionStore()).get<SavedSession>('session')
+        if (saved && saved.tabs.length > 0) {
+          for (const t of saved.tabs) {
+            tabs.value.push({
+              id: t.id,
+              url: t.url,
+              title: t.title,
+              favicon: t.favicon,
+              loading: false,
+              createdAt: t.createdAt,
+              pending: t.pending,
+              unloaded: !t.pending,
+            })
+          }
+          const target =
+            (saved.activeTabId && tabs.value.some((t) => t.id === saved.activeTabId)
+              ? saved.activeTabId
+              : tabs.value[tabs.value.length - 1]?.id) ?? null
+          if (target) await activateTab(target)
+        }
+      }
+    } finally {
+      ready.value = true
+    }
+  }
+
+  async function persistSession(): Promise<void> {
+    if (!ready.value) return
+    const payload: SavedSession = {
+      tabs: tabs.value.map((t) => ({
+        id: t.id,
+        url: t.url,
+        title: t.title,
+        favicon: t.favicon,
+        pending: t.pending,
+        createdAt: t.createdAt,
+      })),
+      activeTabId: activeTabId.value,
+    }
+    await (await sessionStore()).set('session', payload)
+  }
+  watch([tabs, activeTabId], persistSession, { deep: true })
 
   async function createTab(url?: string): Promise<string> {
     const id = nanoid()
@@ -100,6 +176,13 @@ export const useTabsStore = defineStore('tabs', () => {
     const tab = tabs.value.find((t) => t.id === id)
     if (!isTauri()) return
     if (tab && !tab.pending) {
+      if (tab.unloaded) {
+        // Session-restored tab: its native webview was never created. Do it
+        // now, on first activation — see docs/features/session-restore.md.
+        tab.unloaded = false
+        tab.loading = true
+        await invoke('tabs_create', { id, url: tab.url })
+      }
       await invoke('tabs_activate', { id })
     } else {
       // Pending tab has no webview of its own — render the start page in the
@@ -130,6 +213,8 @@ export const useTabsStore = defineStore('tabs', () => {
     tabs,
     activeTabId,
     activeInternalPage,
+    ready,
+    restoreSession,
     createTab,
     navigate,
     closeTab,

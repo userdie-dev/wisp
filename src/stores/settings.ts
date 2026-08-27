@@ -4,6 +4,8 @@ import { openPersistedStore, type PersistedStore } from '@/lib/persisted-store'
 import { BUILT_IN_SEARCH_ENGINES, type SearchEngine } from '@/lib/search-engines'
 
 export type Theme = 'system' | 'light' | 'dark'
+/** What to show when the app starts — see docs/features/session-restore.md. */
+export type StartupBehavior = 'restore' | 'newTab'
 
 let storePromise: Promise<PersistedStore> | null = null
 function settingsStore(): Promise<PersistedStore> {
@@ -16,6 +18,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const customSearchEngines = ref<SearchEngine[]>([])
   const sidebarCollapsed = ref(false)
   const updatesAutoCheck = ref(true)
+  const startupBehavior = ref<StartupBehavior>('restore')
   const ready = ref(false)
 
   const systemPrefersDark = ref(
@@ -34,9 +37,12 @@ export const useSettingsStore = defineStore('settings', () => {
     customSearchEngines.value = (await store.get<SearchEngine[]>('customSearchEngines')) ?? []
     sidebarCollapsed.value = (await store.get<boolean>('sidebarCollapsed')) ?? false
     updatesAutoCheck.value = (await store.get<boolean>('updatesAutoCheck')) ?? true
+    startupBehavior.value = (await store.get<StartupBehavior>('startupBehavior')) ?? 'restore'
     ready.value = true
   }
-  load()
+  /** Resolves once persisted settings have loaded — awaited by consumers that
+   * must read a setting before acting (e.g. session restore in stores/tabs.ts). */
+  const loaded = load()
 
   watch(theme, async (value) => {
     if (!ready.value) return
@@ -61,6 +67,10 @@ export const useSettingsStore = defineStore('settings', () => {
   watch(updatesAutoCheck, async (value) => {
     if (!ready.value) return
     ;(await settingsStore()).set('updatesAutoCheck', value)
+  })
+  watch(startupBehavior, async (value) => {
+    if (!ready.value) return
+    ;(await settingsStore()).set('startupBehavior', value)
   })
 
   watchEffect(() => {
@@ -93,6 +103,8 @@ export const useSettingsStore = defineStore('settings', () => {
     customSearchEngines,
     sidebarCollapsed,
     updatesAutoCheck,
+    startupBehavior,
+    loaded,
     toggleSidebar,
     allSearchEngines,
     activeSearchEngine,
