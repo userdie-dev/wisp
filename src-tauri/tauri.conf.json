@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "wisp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.vadimov.wisp",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -46,7 +46,7 @@
       "endpoints": [
         "https://github.com/userdie-dev/wisp/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMyOEFGMDIxMTYyODJFNzMKUldSekxpZ1dJZkNLd3NBcTJmTDhaRnZSSDBqcU5xcG04bytXb01yMDAwQVQ2Mm9uMXNFYjlHZWEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGQjI1RjQ1RDNBNTFBRjkKUldUNUdxWFRSVit5bjVFeUQ3aTEyKzQvaFQwNS9lQmVNTnlIRUxSZ1kwcFI3SWo2R3VWanZkUGQK",
       "windows": {
         "installMode": "passive"
       }
