@@ -48,6 +48,8 @@ jobs:
     name: Build & release (${{ matrix.platform }})
     if: startsWith(github.ref, 'refs/tags/v')
     needs: check
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
