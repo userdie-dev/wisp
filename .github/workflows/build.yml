@@ -161,3 +161,9 @@ jobs:
           releaseBody: 'Automated build from main @ ${{ github.sha }}. Not a stable release.'
           releaseDraft: false
           prerelease: true
+          # Nightly gets no signing secrets, but tauri.conf.json has
+          # `createUpdaterArtifacts: true` globally — the bundler aborts when a
+          # pubkey is configured and TAURI_SIGNING_PRIVATE_KEY is missing.
+          # Disable updater artifacts for nightly; it stays out of the manifest
+          # by design (see docs/features/auto-update.md).
+          args: '--config {"bundle":{"createUpdaterArtifacts":false}}'
