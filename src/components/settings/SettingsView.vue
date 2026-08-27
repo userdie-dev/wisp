@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ThemeSettings from './ThemeSettings.vue'
 import SearchSettings from './SearchSettings.vue'
+import StartupSettings from './StartupSettings.vue'
 import UpdateSettings from './UpdateSettings.vue'
 </script>
 
@@ -9,6 +10,7 @@ import UpdateSettings from './UpdateSettings.vue'
     <h1 class="text-lg font-semibold">Настройки</h1>
     <ThemeSettings />
     <SearchSettings />
+    <StartupSettings />
     <UpdateSettings />
   </div>
 </template>

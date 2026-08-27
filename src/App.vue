@@ -21,7 +21,10 @@ const updater = useUpdaterStore()
 // user first opens the History page (the only other place it's used).
 useHistoryStore()
 
-onMounted(() => {
+onMounted(async () => {
+  // Restore last session's tabs if enabled, then fall back to one empty tab —
+  // see docs/features/session-restore.md.
+  await tabs.restoreSession()
   if (tabs.tabs.length === 0) tabs.createTab()
 
   // Auto-check for updates if enabled — see docs/features/auto-update.md.

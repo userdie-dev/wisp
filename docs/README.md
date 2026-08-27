@@ -15,6 +15,7 @@
 - Следующие этапы:
   - [features/roadmap.md](./features/roadmap.md) — список кандидатов на реализацию
   - [features/auto-update.md](./features/auto-update.md) — автообновление через GitHub Releases
+  - [features/session-restore.md](./features/session-restore.md) — восстановление вкладок при запуске
 
 ## Статус
 
