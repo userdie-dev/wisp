@@ -10,11 +10,16 @@ import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
 import { useSettingsStore } from '@/stores/settings'
 import { useUpdaterStore } from '@/stores/updater'
+import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { isTauri } from '@/lib/tauri-env'
 
 const tabs = useTabsStore()
 const settings = useSettingsStore()
 const updater = useUpdaterStore()
+
+// Browser-wide keyboard shortcuts (Ctrl+T/W/L/R, Ctrl+Tab, Ctrl+1..9, Alt+←/→)
+// — see docs/features/keyboard-shortcuts.md.
+useKeyboardShortcuts()
 
 // Eagerly instantiate the history store so its `tab-updated` subscription is
 // active for the whole session — otherwise nothing records visits until the

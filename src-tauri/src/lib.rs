@@ -50,6 +50,7 @@ pub fn run() {
             commands::tabs_back,
             commands::tabs_forward,
             commands::tabs_reload,
+            commands::tabs_stop,
             commands::show_internal_page,
             commands::set_content_bounds,
         ])

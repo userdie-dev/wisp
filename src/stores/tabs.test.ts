@@ -6,15 +6,28 @@ vi.mock('@/lib/tauri-env', () => ({ isTauri: () => isTauriMock() }))
 
 const invokeMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }))
-vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }))
+
+const eventListeners = new Map<string, (event: { payload: unknown }) => void>()
+vi.mock('@tauri-apps/api/event', () => ({
+  listen: vi.fn((name: string, cb: (event: { payload: unknown }) => void) => {
+    eventListeners.set(name, cb)
+    return Promise.resolve(() => {})
+  }),
+}))
 
 import { useTabsStore } from './tabs'
+
+/** Fires a Rust-emitted event into whatever handler the store registered. */
+function emit(name: string, payload: unknown) {
+  eventListeners.get(name)?.({ payload })
+}
 
 describe('tabs store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     isTauriMock.mockReturnValue(false)
     invokeMock.mockClear()
+    eventListeners.clear()
     localStorage.clear()
   })
 
@@ -217,6 +230,61 @@ describe('tabs store', () => {
       invokeMock.mockClear()
       await store.activateTab('b')
       expect(invokeMock).not.toHaveBeenCalledWith('tabs_create', expect.anything())
+    })
+  })
+
+  describe('Rust events', () => {
+    async function tauriStore() {
+      isTauriMock.mockReturnValue(true)
+      const store = useTabsStore()
+      // Let the dynamic `import('@tauri-apps/api/event')` in the store resolve
+      // so its `listen(...)` calls register into eventListeners.
+      await new Promise((r) => setTimeout(r))
+      const id = await store.createTab('https://example.com/page')
+      return { store, id }
+    }
+
+    it('applies the loading flag from tab-updated instead of always clearing it', async () => {
+      const { store, id } = await tauriStore()
+
+      emit('tab-updated', { id, url: 'https://example.com/page', loading: false })
+      expect(store.tabs.find((t) => t.id === id)?.loading).toBe(false)
+
+      emit('tab-updated', { id, loading: true })
+      expect(store.tabs.find((t) => t.id === id)?.loading).toBe(true)
+
+      // A title-only update must not disturb the loading flag.
+      emit('tab-updated', { id, title: 'Example' })
+      expect(store.tabs.find((t) => t.id === id)?.loading).toBe(true)
+    })
+
+    it('guesses a favicon when the url changes', async () => {
+      const { store, id } = await tauriStore()
+
+      emit('tab-updated', { id, url: 'https://other.test/deep' })
+
+      const tab = store.tabs.find((t) => t.id === id)
+      expect(tab?.url).toBe('https://other.test/deep')
+      expect(tab?.favicon).toBe('https://other.test/favicon.ico')
+    })
+
+    it('tracks back/forward availability from tab-nav-state', async () => {
+      const { store, id } = await tauriStore()
+
+      emit('tab-nav-state', { id, canGoBack: true, canGoForward: false })
+
+      const tab = store.tabs.find((t) => t.id === id)
+      expect(tab?.canGoBack).toBe(true)
+      expect(tab?.canGoForward).toBe(false)
+    })
+
+    it('clearFavicon resets a bad guess', async () => {
+      const { store, id } = await tauriStore()
+      emit('tab-updated', { id, url: 'https://other.test/' })
+      expect(store.tabs.find((t) => t.id === id)?.favicon).toBe('https://other.test/favicon.ico')
+
+      store.clearFavicon(id)
+      expect(store.tabs.find((t) => t.id === id)?.favicon).toBeNull()
     })
   })
 })

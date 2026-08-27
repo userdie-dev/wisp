@@ -16,6 +16,9 @@
   - [features/roadmap.md](./features/roadmap.md) — список кандидатов на реализацию
   - [features/auto-update.md](./features/auto-update.md) — автообновление через GitHub Releases
   - [features/session-restore.md](./features/session-restore.md) — восстановление вкладок при запуске
+  - [features/navigation-state.md](./features/navigation-state.md) — блокировка кнопок назад/вперёд, спиннер загрузки, Stop
+  - [features/favicons.md](./features/favicons.md) — иконки сайтов у вкладок
+  - [features/keyboard-shortcuts.md](./features/keyboard-shortcuts.md) — горячие клавиши
 
 ## Статус
 

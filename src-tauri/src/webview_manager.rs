@@ -1,4 +1,5 @@
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl, Window};
@@ -32,6 +33,45 @@ pub struct TabRegistry {
     order: Mutex<Vec<String>>,
     active: Mutex<Option<ActiveContent>>,
     bounds: Mutex<ContentBounds>,
+    /// Per-tab navigation history, keyed by tab id. `Arc` because a clone is
+    /// captured into each webview's `'static` `on_navigation` closure.
+    /// See docs/features/navigation-state.md.
+    nav: Arc<Mutex<HashMap<String, NavHistory>>>,
+}
+
+/// Reconstructed back/forward history for one tab. Tauri exposes no
+/// cross-platform `can_go_back`/`can_go_forward`, so it is rebuilt from
+/// `WebviewBuilder::on_navigation` callbacks — see
+/// docs/features/navigation-state.md.
+#[derive(Default)]
+struct NavHistory {
+    entries: Vec<String>,
+    index: usize,
+}
+
+/// Folds one observed navigation into the history model.
+fn apply_navigation(history: &mut NavHistory, url: &str) {
+    if history.entries.is_empty() {
+        history.entries.push(url.to_string());
+        history.index = 0;
+        return;
+    }
+    let is_forward = history
+        .entries
+        .get(history.index + 1)
+        .is_some_and(|next| next == url);
+    let is_back = history.index > 0 && history.entries[history.index - 1] == url;
+    if is_forward {
+        history.index += 1;
+    } else if is_back {
+        history.index -= 1;
+    } else if history.entries[history.index] == url {
+        // Same URL as the current entry (reload) — nothing changes.
+    } else {
+        history.entries.truncate(history.index + 1);
+        history.entries.push(url.to_string());
+        history.index = history.entries.len() - 1;
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -69,22 +109,32 @@ impl TabRegistry {
         let tab_id_for_load = id.clone();
         let app_for_title = app.clone();
         let tab_id_for_title = id.clone();
+        let app_for_nav = app.clone();
+        let tab_id_for_nav = id.clone();
+        let nav_for_nav = self.nav.clone();
 
         // Bounds are set explicitly on activate/resize instead of via
         // `auto_resize()`, since the content webview must track a rect
         // smaller than the full window (sidebar + toolbar stay outside it).
-        // Load/title callbacks are registered on the builder (Tauri fires
-        // them for the webview being constructed) and forwarded to the
-        // frontend as `tab-updated`, which both the tabs store and the
-        // history store listen to.
+        // Load/title/navigation callbacks are registered on the builder (Tauri
+        // fires them for the webview being constructed) and forwarded to the
+        // frontend as `tab-updated` / `tab-nav-state`, which the tabs store and
+        // the history store listen to.
         let builder = WebviewBuilder::new(label_for(&id), WebviewUrl::External(parsed_url))
             .on_page_load(move |wv, payload| {
-                if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                let event = payload.event();
+                if matches!(event, tauri::webview::PageLoadEvent::Started) {
+                    let _ = app_for_load.emit(
+                        "tab-updated",
+                        serde_json::json!({ "id": tab_id_for_load, "loading": true }),
+                    );
+                } else if matches!(event, tauri::webview::PageLoadEvent::Finished) {
                     let _ = app_for_load.emit(
                         "tab-updated",
                         serde_json::json!({
                             "id": tab_id_for_load,
                             "url": wv.url().map(|u| u.to_string()).unwrap_or_default(),
+                            "loading": false,
                         }),
                     );
                 }
@@ -98,6 +148,25 @@ impl TabRegistry {
                         "url": wv.url().map(|u| u.to_string()).unwrap_or_default(),
                     }),
                 );
+            })
+            // Observes every real navigation (link clicks, redirects, form
+            // submits, page-initiated history traversal, and our own
+            // `tabs_back/forward/reload` evals) to keep the per-tab history
+            // model current, then pushes the derived back/forward availability
+            // to the frontend — see docs/features/navigation-state.md.
+            .on_navigation(move |url| {
+                let mut map = nav_for_nav.lock().unwrap();
+                let history = map.entry(tab_id_for_nav.clone()).or_default();
+                apply_navigation(history, url.as_str());
+                let _ = app_for_nav.emit(
+                    "tab-nav-state",
+                    serde_json::json!({
+                        "id": tab_id_for_nav,
+                        "canGoBack": history.index > 0,
+                        "canGoForward": history.index + 1 < history.entries.len(),
+                    }),
+                );
+                true
             });
 
         // Created hidden at the current content rect; `activate_tab` brings it
@@ -110,6 +179,14 @@ impl TabRegistry {
         )?;
         webview.hide()?;
 
+        // Seed the history with the initial URL so the first `on_navigation`
+        // (fired for the initial load, or not, depending on the platform) is a
+        // no-op rather than a spurious second entry. A redirecting start URL
+        // still produces one — documented in navigation-state.md.
+        self.nav.lock().unwrap().insert(
+            id.clone(),
+            NavHistory { entries: vec![url.clone()], index: 0 },
+        );
         self.order.lock().unwrap().push(id.clone());
         Ok(TabCreated { id, url })
     }
@@ -119,6 +196,7 @@ impl TabRegistry {
             webview.close()?;
         }
         self.order.lock().unwrap().retain(|id| id != tab_id);
+        self.nav.lock().unwrap().remove(tab_id);
         let mut active = self.active.lock().unwrap();
         if *active == Some(ActiveContent::Tab(tab_id.to_string())) {
             *active = None;
@@ -183,5 +261,54 @@ impl TabRegistry {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_navigation, NavHistory};
+
+    fn history_after(urls: &[&str]) -> NavHistory {
+        let mut history = NavHistory::default();
+        for url in urls {
+            apply_navigation(&mut history, url);
+        }
+        history
+    }
+
+    #[test]
+    fn linear_navigation_appends_entries() {
+        let h = history_after(&["a", "b", "c"]);
+        assert_eq!(h.entries, ["a", "b", "c"]);
+        assert_eq!(h.index, 2);
+    }
+
+    #[test]
+    fn back_then_forward_moves_the_index_without_growing() {
+        let mut h = history_after(&["a", "b", "c"]);
+        apply_navigation(&mut h, "b");
+        assert_eq!(h.index, 1);
+        apply_navigation(&mut h, "a");
+        assert_eq!(h.index, 0);
+        apply_navigation(&mut h, "b");
+        assert_eq!(h.index, 1);
+        assert_eq!(h.entries.len(), 3);
+    }
+
+    #[test]
+    fn new_navigation_after_going_back_truncates_the_forward_entries() {
+        let mut h = history_after(&["a", "b", "c"]);
+        apply_navigation(&mut h, "b"); // back
+        apply_navigation(&mut h, "x"); // new branch
+        assert_eq!(h.entries, ["a", "b", "x"]);
+        assert_eq!(h.index, 2);
+    }
+
+    #[test]
+    fn reloading_the_current_url_changes_nothing() {
+        let mut h = history_after(&["a", "b"]);
+        apply_navigation(&mut h, "b");
+        assert_eq!(h.entries, ["a", "b"]);
+        assert_eq!(h.index, 1);
     }
 }

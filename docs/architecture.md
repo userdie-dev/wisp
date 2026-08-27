@@ -80,10 +80,17 @@ Vue 3.6 всё ещё RC, и большинство UI-китов (включа�
 | `tabs_close(id)` | закрыть Webview вкладки |
 | `tabs_activate(id)` | скрыть текущий активный webview, показать/переразместить указанный |
 | `tabs_navigate(id, url)` | `Webview::navigate` |
-| `tabs_back(id)` / `tabs_forward(id)` / `tabs_reload(id)` | через `Webview::eval("history.back()")` и т.п. |
+| `tabs_back(id)` / `tabs_forward(id)` / `tabs_reload(id)` / `tabs_stop(id)` | через `Webview::eval("history.back()")`, `window.stop()` и т.п. |
 | `show_internal_page()` / `hide_internal_page()` | скрыть активный content-webview, чтобы chrome отрисовал внутреннюю страницу, и обратно |
 
-События из Rust во фронтенд (`emit`): `tab-updated` (title/url/favicon/loading изменились) — ловится в Pinia-сторе вкладок и одновременно пишет запись в историю через `plugin-store`.
+События из Rust во фронтенд (`emit`):
+
+- `tab-updated` — `{ id, url?, title?, loading? }`. Ловится в Pinia-сторе вкладок и
+  одновременно пишет запись в историю через `plugin-store` (по `url`). `loading` приходит
+  из `PageLoadEvent::Started/Finished` — см. [features/navigation-state.md](./features/navigation-state.md).
+- `tab-nav-state` — `{ id, canGoBack, canGoForward }`. Модель истории вкладки ведётся в
+  Rust через `WebviewBuilder::on_navigation`; фронтенд по этому событию блокирует кнопки
+  назад/вперёд.
 
 Подробная схема — в исходниках `src-tauri/src/webview_manager.rs` и `src-tauri/src/commands.rs`.
 

@@ -4,6 +4,7 @@ import { nanoid } from 'nanoid'
 import { isTauri } from '@/lib/tauri-env'
 import { openPersistedStore, type PersistedStore } from '@/lib/persisted-store'
 import { useSettingsStore } from '@/stores/settings'
+import { faviconFor } from '@/lib/favicon'
 
 export interface Tab {
   id: string
@@ -18,6 +19,10 @@ export interface Tab {
   /** True for a session-restored tab whose native webview hasn't been created
    * yet — created lazily on first activation. See docs/features/session-restore.md. */
   unloaded?: boolean
+  /** Back/forward availability from the Rust-side history model, delivered via
+   * the `tab-nav-state` event. See docs/features/navigation-state.md. */
+  canGoBack?: boolean
+  canGoForward?: boolean
 }
 
 interface SavedTab {
@@ -54,13 +59,30 @@ export const useTabsStore = defineStore('tabs', () => {
 
   if (isTauri()) {
     import('@tauri-apps/api/event').then(({ listen }) => {
-      listen<{ id: string; url?: string; title?: string }>('tab-updated', (event) => {
-        const tab = tabs.value.find((t) => t.id === event.payload.id)
-        if (!tab) return
-        if (event.payload.url !== undefined) tab.url = event.payload.url
-        if (event.payload.title !== undefined) tab.title = event.payload.title
-        tab.loading = false
-      })
+      listen<{ id: string; url?: string; title?: string; loading?: boolean }>(
+        'tab-updated',
+        (event) => {
+          const tab = tabs.value.find((t) => t.id === event.payload.id)
+          if (!tab) return
+          if (event.payload.url !== undefined && event.payload.url !== tab.url) {
+            tab.url = event.payload.url
+            // The page's real favicon isn't observable from here — guess it
+            // from the origin. See docs/features/favicons.md.
+            tab.favicon = faviconFor(event.payload.url)
+          }
+          if (event.payload.title !== undefined) tab.title = event.payload.title
+          if (event.payload.loading !== undefined) tab.loading = event.payload.loading
+        },
+      )
+      listen<{ id: string; canGoBack: boolean; canGoForward: boolean }>(
+        'tab-nav-state',
+        (event) => {
+          const tab = tabs.value.find((t) => t.id === event.payload.id)
+          if (!tab) return
+          tab.canGoBack = event.payload.canGoBack
+          tab.canGoForward = event.payload.canGoForward
+        },
+      )
     })
   }
 
@@ -121,7 +143,7 @@ export const useTabsStore = defineStore('tabs', () => {
       id,
       url: url ?? '',
       title: url ? url : 'Новая вкладка',
-      favicon: null,
+      favicon: url ? faviconFor(url) : null,
       loading: !!url,
       createdAt: Date.now(),
       pending: !url,
@@ -140,6 +162,7 @@ export const useTabsStore = defineStore('tabs', () => {
     const tab = tabs.value.find((t) => t.id === id)
     if (!tab) return
     tab.url = url
+    tab.favicon = faviconFor(url)
     tab.loading = true
     const wasPending = tab.pending
     tab.pending = false // clears the start page regardless of Tauri availability
@@ -208,6 +231,17 @@ export const useTabsStore = defineStore('tabs', () => {
   async function reload(id: string): Promise<void> {
     if (isTauri()) await invoke('tabs_reload', { id })
   }
+  async function stop(id: string): Promise<void> {
+    const tab = tabs.value.find((t) => t.id === id)
+    if (tab) tab.loading = false
+    if (isTauri()) await invoke('tabs_stop', { id })
+  }
+
+  /** Called from TabItem's `<img @error>` when a guessed favicon 404s. */
+  function clearFavicon(id: string): void {
+    const tab = tabs.value.find((t) => t.id === id)
+    if (tab) tab.favicon = null
+  }
 
   return {
     tabs,
@@ -223,5 +257,7 @@ export const useTabsStore = defineStore('tabs', () => {
     goBack,
     goForward,
     reload,
+    stop,
+    clearFavicon,
   }
 })

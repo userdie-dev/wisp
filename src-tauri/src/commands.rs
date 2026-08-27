@@ -89,6 +89,15 @@ pub async fn tabs_reload(
 }
 
 #[tauri::command]
+pub async fn tabs_stop(
+    app: AppHandle,
+    id: String,
+    registry: State<'_, TabRegistry>,
+) -> Result<(), String> {
+    to_string_err(registry.eval_on_tab(&app, &id, "window.stop()"))
+}
+
+#[tauri::command]
 pub async fn show_internal_page(
     app: AppHandle,
     registry: State<'_, TabRegistry>,

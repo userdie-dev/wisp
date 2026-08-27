@@ -48,6 +48,7 @@ function newTab() {
         :active="tab.id === tabs.activeTabId"
         @select="tabs.activateTab(tab.id)"
         @close="tabs.closeTab(tab.id)"
+        @favicon-error="tabs.clearFavicon(tab.id)"
       />
     </div>
 
