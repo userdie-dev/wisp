@@ -1,6 +1,6 @@
 [package]
 name = "browser"
-version = "0.2.0"
+version = "0.2.1"
 description = "Desktop browser shell built on Tauri's system webviews (WebView2/V8 on Windows, WebKit elsewhere)"
 edition = "2021"
 
