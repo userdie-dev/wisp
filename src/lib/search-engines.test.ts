@@ -7,6 +7,11 @@ describe('buildSearchUrl', () => {
     expect(buildSearchUrl(google, 'hello world')).toBe('https://www.google.com/search?q=hello%20world')
   })
 
+  it('builds a Yandex search URL', () => {
+    const yandex = BUILT_IN_SEARCH_ENGINES.find((e) => e.id === 'yandex')!
+    expect(buildSearchUrl(yandex, 'hello world')).toBe('https://yandex.com/search/?text=hello%20world')
+  })
+
   it('encodes special characters', () => {
     const engine = { id: 'x', name: 'X', urlTemplate: 'https://x.test/?q=%s', builtIn: false }
     expect(buildSearchUrl(engine, 'a&b=c')).toBe('https://x.test/?q=a%26b%3Dc')

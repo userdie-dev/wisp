@@ -6,7 +6,7 @@
 
 ```ts
 interface SearchEngine {
-  id: string          // 'google' | 'bing' | 'duckduckgo' | 'custom-<nanoid>'
+  id: string          // 'google' | 'bing' | 'duckduckgo' | 'yandex' | 'custom-<nanoid>'
   name: string
   urlTemplate: string // '%s' заменяется на encodeURIComponent(query)
   builtIn: boolean
@@ -20,6 +20,7 @@ interface SearchEngine {
 | google | Google | `https://www.google.com/search?q=%s` |
 | bing | Bing | `https://www.bing.com/search?q=%s` |
 | duckduckgo | DuckDuckGo | `https://duckduckgo.com/?q=%s` |
+| yandex | Yandex | `https://yandex.com/search/?text=%s` |
 
 Пользователь может добавить свои (`builtIn: false`) с произвольным `urlTemplate`, содержащим `%s`.
 

@@ -25,6 +25,12 @@ export const BUILT_IN_SEARCH_ENGINES: readonly SearchEngine[] = [
     urlTemplate: 'https://duckduckgo.com/?q=%s',
     builtIn: true,
   },
+  {
+    id: 'yandex',
+    name: 'Yandex',
+    urlTemplate: 'https://yandex.com/search/?text=%s',
+    builtIn: true,
+  },
 ]
 
 export function buildSearchUrl(engine: SearchEngine, query: string): string {
