@@ -11,8 +11,17 @@ fn to_string_err<T>(result: tauri::Result<T>) -> Result<T, String> {
     result.map_err(|e| e.to_string())
 }
 
+// These commands are all `async` on purpose. `Window::add_child` and the
+// webview show/hide/set_position/navigate methods deadlock when invoked from a
+// *synchronous* Tauri command on Windows/WebView2 (they need to run work on the
+// main thread while a sync command is itself blocking the main thread) — see
+// tauri-apps/tauri#12032 and #12521. Declaring the command `async` makes Tauri
+// run it on a worker thread, so the main-thread dispatch inside these methods
+// can complete. None of the bodies `.await` while holding the registry's
+// `Mutex`, so the non-`Send` guards are fine.
+
 #[tauri::command]
-pub fn tabs_create(
+pub async fn tabs_create(
     app: AppHandle,
     id: String,
     url: String,
@@ -25,7 +34,7 @@ pub fn tabs_create(
 }
 
 #[tauri::command]
-pub fn tabs_close(
+pub async fn tabs_close(
     app: AppHandle,
     id: String,
     registry: State<'_, TabRegistry>,
@@ -34,7 +43,7 @@ pub fn tabs_close(
 }
 
 #[tauri::command]
-pub fn tabs_activate(
+pub async fn tabs_activate(
     app: AppHandle,
     id: String,
     registry: State<'_, TabRegistry>,
@@ -43,7 +52,7 @@ pub fn tabs_activate(
 }
 
 #[tauri::command]
-pub fn tabs_navigate(
+pub async fn tabs_navigate(
     app: AppHandle,
     id: String,
     url: String,
@@ -53,7 +62,7 @@ pub fn tabs_navigate(
 }
 
 #[tauri::command]
-pub fn tabs_back(
+pub async fn tabs_back(
     app: AppHandle,
     id: String,
     registry: State<'_, TabRegistry>,
@@ -62,7 +71,7 @@ pub fn tabs_back(
 }
 
 #[tauri::command]
-pub fn tabs_forward(
+pub async fn tabs_forward(
     app: AppHandle,
     id: String,
     registry: State<'_, TabRegistry>,
@@ -71,7 +80,7 @@ pub fn tabs_forward(
 }
 
 #[tauri::command]
-pub fn tabs_reload(
+pub async fn tabs_reload(
     app: AppHandle,
     id: String,
     registry: State<'_, TabRegistry>,
@@ -80,7 +89,7 @@ pub fn tabs_reload(
 }
 
 #[tauri::command]
-pub fn show_internal_page(
+pub async fn show_internal_page(
     app: AppHandle,
     registry: State<'_, TabRegistry>,
 ) -> Result<(), String> {
@@ -91,7 +100,7 @@ pub fn show_internal_page(
 /// every time the sidebar/toolbar layout changes — see
 /// src/composables/useContentBounds.ts and docs/architecture.md.
 #[tauri::command]
-pub fn set_content_bounds(
+pub async fn set_content_bounds(
     app: AppHandle,
     x: f64,
     y: f64,
