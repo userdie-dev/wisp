@@ -1,9 +1,21 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl, Window};
+use tauri::menu::{Menu, MenuBuilder};
+use tauri::webview::DownloadEvent;
+use tauri::{
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Webview, WebviewBuilder, WebviewUrl,
+    Window, Wry,
+};
 use url::Url;
+
+/// Injected into every content webview. Bridges page-side clicks / context
+/// menus back to the chrome side over a `wisp://` sentinel navigation — see
+/// `handle_bridge` below and docs/features/new-tab-and-context-menu.md.
+const CONTENT_SCRIPT: &str = include_str!("content_script.js");
 
 /// Pixel rect of the "hole" in the chrome webview where the active tab's
 /// content webview (or nothing, if an internal page is shown) is drawn.
@@ -37,6 +49,27 @@ pub struct TabRegistry {
     /// captured into each webview's `'static` `on_navigation` closure.
     /// See docs/features/navigation-state.md.
     nav: Arc<Mutex<HashMap<String, NavHistory>>>,
+    /// Context gathered from the last right-click in a content webview, read
+    /// back by the `on_menu_event` handler in lib.rs when an item is chosen.
+    /// See docs/features/new-tab-and-context-menu.md.
+    menu_context: Arc<Mutex<Option<MenuContext>>>,
+    /// The last context `Menu` — kept alive here so it isn't dropped out from
+    /// under an in-flight popup (GTK popups are async).
+    context_menu: Arc<Mutex<Option<Menu<Wry>>>>,
+    /// Override for the download destination directory. `None` = the OS
+    /// "Downloads" folder. Set from the frontend via `downloads_set_dir`.
+    downloads_dir: Arc<Mutex<Option<PathBuf>>>,
+    /// Monotonic id source for download events.
+    download_seq: Arc<AtomicU64>,
+}
+
+/// What the cursor was over when a content webview's context menu was opened.
+#[derive(Clone, Default)]
+pub struct MenuContext {
+    pub tab_id: String,
+    pub link_url: Option<String>,
+    pub src_url: Option<String>,
+    pub selection_text: Option<String>,
 }
 
 /// Reconstructed back/forward history for one tab. Tauri exposes no
@@ -112,6 +145,11 @@ impl TabRegistry {
         let app_for_nav = app.clone();
         let tab_id_for_nav = id.clone();
         let nav_for_nav = self.nav.clone();
+        let window_for_nav = window.clone();
+
+        let app_for_dl = app.clone();
+        let dl_dir = self.downloads_dir.clone();
+        let dl_seq = self.download_seq.clone();
 
         // Bounds are set explicitly on activate/resize instead of via
         // `auto_resize()`, since the content webview must track a rect
@@ -154,7 +192,14 @@ impl TabRegistry {
             // `tabs_back/forward/reload` evals) to keep the per-tab history
             // model current, then pushes the derived back/forward availability
             // to the frontend — see docs/features/navigation-state.md.
+            //
+            // Also the transport for the injected content script: a `wisp://`
+            // URL is a message, not a navigation — handle it and cancel.
             .on_navigation(move |url| {
+                if url.scheme() == "wisp" {
+                    handle_bridge(&app_for_nav, &tab_id_for_nav, &window_for_nav, url);
+                    return false;
+                }
                 let mut map = nav_for_nav.lock().unwrap();
                 let history = map.entry(tab_id_for_nav.clone()).or_default();
                 apply_navigation(history, url.as_str());
@@ -166,6 +211,50 @@ impl TabRegistry {
                         "canGoForward": history.index + 1 < history.entries.len(),
                     }),
                 );
+                true
+            })
+            .initialization_script(CONTENT_SCRIPT)
+            // WebView2 / WebKit download interception. Wry only surfaces
+            // request + finish (no byte progress) — see
+            // docs/features/downloads.md.
+            .on_download(move |_webview, event| {
+                match event {
+                    DownloadEvent::Requested { url, destination } => {
+                        let dir = dl_dir
+                            .lock()
+                            .unwrap()
+                            .clone()
+                            .or_else(|| app_for_dl.path().download_dir().ok())
+                            .unwrap_or_else(|| PathBuf::from("."));
+                        let _ = std::fs::create_dir_all(&dir);
+                        let path = unique_path(&dir, &file_name_from_url(&url));
+                        *destination = path.clone();
+                        let id = dl_seq.fetch_add(1, Ordering::Relaxed);
+                        let _ = app_for_dl.emit(
+                            "download-started",
+                            serde_json::json!({
+                                "id": id.to_string(),
+                                "url": url.to_string(),
+                                "filename": path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("download"),
+                                "path": path.to_string_lossy(),
+                            }),
+                        );
+                    }
+                    DownloadEvent::Finished { url, path, success } => {
+                        let _ = app_for_dl.emit(
+                            "download-finished",
+                            serde_json::json!({
+                                "url": url.to_string(),
+                                "path": path.as_ref().map(|p| p.to_string_lossy().to_string()),
+                                "success": success,
+                            }),
+                        );
+                    }
+                    _ => {}
+                }
                 true
             });
 
@@ -262,6 +351,165 @@ impl TabRegistry {
         }
         Ok(())
     }
+
+    /// The context of the last content-webview right-click, consumed by the
+    /// `on_menu_event` handler in lib.rs.
+    pub fn menu_context(&self) -> Option<MenuContext> {
+        self.menu_context.lock().unwrap().clone()
+    }
+
+    pub fn set_menu_context(&self, ctx: MenuContext) {
+        *self.menu_context.lock().unwrap() = Some(ctx);
+    }
+
+    pub fn retain_context_menu(&self, menu: Menu<Wry>) {
+        *self.context_menu.lock().unwrap() = Some(menu);
+    }
+
+    /// Effective download directory as a string (the override, else the OS
+    /// "Downloads" folder, else the process working directory).
+    pub fn downloads_dir(&self, app: &AppHandle) -> String {
+        self.downloads_dir
+            .lock()
+            .unwrap()
+            .clone()
+            .or_else(|| app.path().download_dir().ok())
+            .unwrap_or_else(|| PathBuf::from("."))
+            .to_string_lossy()
+            .to_string()
+    }
+
+    pub fn set_downloads_dir(&self, dir: Option<PathBuf>) {
+        *self.downloads_dir.lock().unwrap() = dir;
+    }
+}
+
+/// Handles a `wisp://ipc/?k=<kind>&p=<json>` sentinel navigation from the
+/// injected content script. Runs on the main thread (Wry navigation callback).
+fn handle_bridge(app: &AppHandle, tab_id: &str, window: &Window, url: &Url) {
+    let mut kind = String::new();
+    let mut payload = serde_json::Value::Null;
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "k" => kind = value.into_owned(),
+            "p" => {
+                payload = serde_json::from_str(value.as_ref()).unwrap_or(serde_json::Value::Null)
+            }
+            _ => {}
+        }
+    }
+
+    match kind.as_str() {
+        "newtab" => {
+            if let Some(target) = payload.get("url").and_then(|v| v.as_str()) {
+                let background = payload
+                    .get("background")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let _ = app.emit(
+                    "tab-open-request",
+                    serde_json::json!({ "url": target, "background": background }),
+                );
+            }
+        }
+        "contextmenu" => {
+            let ctx = MenuContext {
+                tab_id: tab_id.to_string(),
+                link_url: json_str(&payload, "linkUrl"),
+                src_url: json_str(&payload, "srcUrl"),
+                selection_text: json_str(&payload, "selectionText"),
+            };
+            let registry = app.state::<TabRegistry>();
+            registry.set_menu_context(ctx.clone());
+            if let Ok(menu) = build_context_menu(app, &ctx) {
+                registry.retain_context_menu(menu.clone());
+                let _ = window.popup_menu(&menu);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn json_str(value: &serde_json::Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// Builds the native right-click menu; item ids are matched in lib.rs's
+/// `on_menu_event`. Only sections relevant to what was clicked are shown.
+fn build_context_menu(app: &AppHandle, ctx: &MenuContext) -> tauri::Result<Menu<Wry>> {
+    let mut builder = MenuBuilder::new(app);
+    if ctx.link_url.is_some() {
+        builder = builder
+            .text("wisp:open-new-tab", "Открыть ссылку в новой вкладке")
+            .text("wisp:open-background", "Открыть ссылку в фоновой вкладке")
+            .text("wisp:copy-link", "Копировать адрес ссылки")
+            .separator();
+    }
+    if ctx.src_url.is_some() {
+        builder = builder
+            .text("wisp:open-image", "Открыть изображение в новой вкладке")
+            .text("wisp:copy-image", "Копировать адрес изображения")
+            .separator();
+    }
+    if ctx.selection_text.is_some() {
+        builder = builder
+            .text("wisp:copy", "Копировать")
+            .text("wisp:search", "Найти в поисковике")
+            .separator();
+    }
+    builder
+        .text("wisp:back", "Назад")
+        .text("wisp:forward", "Вперёд")
+        .text("wisp:reload", "Обновить")
+        .build()
+}
+
+/// Last path segment of a URL, lightly sanitised for use as a file name.
+fn file_name_from_url(url: &Url) -> String {
+    let raw = url
+        .path_segments()
+        .and_then(|segments| segments.last())
+        .unwrap_or("")
+        .replace("%20", " ");
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| !matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0'))
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        "download".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// `dir/name`, or `dir/name (n).ext` if that already exists.
+fn unique_path(dir: &Path, name: &str) -> PathBuf {
+    let first = dir.join(name);
+    if !first.exists() {
+        return first;
+    }
+    let as_path = Path::new(name);
+    let stem = as_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("download");
+    let ext = as_path.extension().and_then(|s| s.to_str());
+    for n in 1..1000 {
+        let candidate = match ext {
+            Some(ext) => dir.join(format!("{stem} ({n}).{ext}")),
+            None => dir.join(format!("{stem} ({n})")),
+        };
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    first
 }
 
 #[cfg(test)]

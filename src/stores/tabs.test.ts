@@ -109,6 +109,46 @@ describe('tabs store', () => {
     })
   })
 
+  describe('openFromContent', () => {
+    it('opens a foreground tab right after the active one and activates it', async () => {
+      const store = useTabsStore()
+      const first = await store.createTab('https://a.test')
+      const second = await store.createTab('https://b.test')
+      await store.activateTab(first)
+
+      const opened = await store.openFromContent('https://c.test', false)
+
+      expect(store.tabs.map((t) => t.id)).toEqual([first, opened, second])
+      expect(store.activeTabId).toBe(opened)
+      expect(store.tabs.find((t) => t.id === opened)?.pending).toBe(false)
+    })
+
+    it('opens a background tab without activating it (Tauri)', async () => {
+      isTauriMock.mockReturnValue(true)
+      const store = useTabsStore()
+      const first = await store.createTab('https://a.test')
+      invokeMock.mockClear()
+
+      const opened = await store.openFromContent('https://bg.test', true)
+
+      expect(store.activeTabId).toBe(first)
+      expect(invokeMock).toHaveBeenCalledWith('tabs_create', { id: opened, url: 'https://bg.test' })
+      expect(invokeMock).not.toHaveBeenCalledWith('tabs_activate', { id: opened })
+    })
+
+    it('is driven by the tab-open-request event', async () => {
+      isTauriMock.mockReturnValue(true)
+      const store = useTabsStore()
+      await new Promise((r) => setTimeout(r))
+      await store.createTab('https://a.test')
+
+      emit('tab-open-request', { url: 'https://evt.test', background: false })
+      await new Promise((r) => setTimeout(r))
+
+      expect(store.tabs.some((t) => t.url === 'https://evt.test')).toBe(true)
+    })
+  })
+
   describe('closeTab', () => {
     it('removes the tab and activates the next one', async () => {
       const store = useTabsStore()

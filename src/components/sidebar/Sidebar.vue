@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Plus, Clock, Star, Settings, PanelLeftClose } from '@lucide/vue'
+import { Plus, Clock, Star, Download, Settings, PanelLeftClose } from '@lucide/vue'
 import { useTabsStore } from '@/stores/tabs'
 import { useSettingsStore } from '@/stores/settings'
 import TabItem from './TabItem.vue'
@@ -68,6 +68,14 @@ function newTab() {
         @click="tabs.showInternalPage('bookmarks')"
       >
         <Star :size="18" />
+      </button>
+      <button
+        class="rounded p-2 hover:bg-fg/10"
+        :class="{ 'text-accent': tabs.activeInternalPage === 'downloads' }"
+        title="Загрузки"
+        @click="tabs.showInternalPage('downloads')"
+      >
+        <Download :size="18" />
       </button>
       <button
         class="rounded p-2 hover:bg-fg/10"

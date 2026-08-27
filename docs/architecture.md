@@ -82,6 +82,12 @@ Vue 3.6 всё ещё RC, и большинство UI-китов (включа�
 | `tabs_navigate(id, url)` | `Webview::navigate` |
 | `tabs_back(id)` / `tabs_forward(id)` / `tabs_reload(id)` / `tabs_stop(id)` | через `Webview::eval("history.back()")`, `window.stop()` и т.п. |
 | `show_internal_page()` / `hide_internal_page()` | скрыть активный content-webview, чтобы chrome отрисовал внутреннюю страницу, и обратно |
+| `downloads_dir()` / `downloads_set_dir(path?)` | папка загрузок — см. [features/downloads.md](./features/downloads.md) |
+
+Кроме команд, каждый content-webview несёт инъектированный `content_script.js` и
+колбэки `on_navigation` (перехват `wisp://`-моста), `on_download` (загрузки).
+Глобальный `Builder::on_menu_event` обрабатывает нативное контекстное меню —
+см. [features/new-tab-and-context-menu.md](./features/new-tab-and-context-menu.md).
 
 События из Rust во фронтенд (`emit`):
 
@@ -91,6 +97,11 @@ Vue 3.6 всё ещё RC, и большинство UI-китов (включа�
 - `tab-nav-state` — `{ id, canGoBack, canGoForward }`. Модель истории вкладки ведётся в
   Rust через `WebviewBuilder::on_navigation`; фронтенд по этому событию блокирует кнопки
   назад/вперёд.
+- `tab-open-request` — `{ url, background }`. Ссылка/`window.open`/пункт меню «открыть
+  в новой вкладке». `wisp-tab-command`, `wisp-search` — прочие действия контекстного
+  меню. `download-started` / `download-finished` — загрузки. См.
+  [features/new-tab-and-context-menu.md](./features/new-tab-and-context-menu.md) и
+  [features/downloads.md](./features/downloads.md).
 
 Подробная схема — в исходниках `src-tauri/src/webview_manager.rs` и `src-tauri/src/commands.rs`.
 

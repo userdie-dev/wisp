@@ -19,6 +19,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const sidebarCollapsed = ref(false)
   const updatesAutoCheck = ref(true)
   const startupBehavior = ref<StartupBehavior>('restore')
+  /** Download destination folder. `null` = the OS "Downloads" folder. Applied
+   * to the Rust side on startup — see docs/features/downloads.md. */
+  const downloadsDir = ref<string | null>(null)
   const ready = ref(false)
 
   const systemPrefersDark = ref(
@@ -38,6 +41,7 @@ export const useSettingsStore = defineStore('settings', () => {
     sidebarCollapsed.value = (await store.get<boolean>('sidebarCollapsed')) ?? false
     updatesAutoCheck.value = (await store.get<boolean>('updatesAutoCheck')) ?? true
     startupBehavior.value = (await store.get<StartupBehavior>('startupBehavior')) ?? 'restore'
+    downloadsDir.value = (await store.get<string>('downloadsDir')) ?? null
     ready.value = true
   }
   /** Resolves once persisted settings have loaded — awaited by consumers that
@@ -72,6 +76,10 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!ready.value) return
     ;(await settingsStore()).set('startupBehavior', value)
   })
+  watch(downloadsDir, async (value) => {
+    if (!ready.value) return
+    ;(await settingsStore()).set('downloadsDir', value)
+  })
 
   watchEffect(() => {
     const isDark = theme.value === 'dark' || (theme.value === 'system' && systemPrefersDark.value)
@@ -104,6 +112,7 @@ export const useSettingsStore = defineStore('settings', () => {
     sidebarCollapsed,
     updatesAutoCheck,
     startupBehavior,
+    downloadsDir,
     loaded,
     toggleSidebar,
     allSearchEngines,

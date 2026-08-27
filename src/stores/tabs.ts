@@ -43,7 +43,7 @@ function sessionStore(): Promise<PersistedStore> {
   return (sessionStorePromise ??= openPersistedStore('session.json'))
 }
 
-export type InternalPage = 'history' | 'bookmarks' | 'settings' | null
+export type InternalPage = 'history' | 'bookmarks' | 'settings' | 'downloads' | null
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const { invoke: tauriInvoke } = await import('@tauri-apps/api/core')
@@ -83,6 +83,11 @@ export const useTabsStore = defineStore('tabs', () => {
           tab.canGoForward = event.payload.canGoForward
         },
       )
+      // A link / window.open / context-menu action inside page content asked
+      // to open a tab — see docs/features/new-tab-and-context-menu.md.
+      listen<{ url: string; background?: boolean }>('tab-open-request', (event) => {
+        void openFromContent(event.payload.url, event.payload.background ?? false)
+      })
     })
   }
 
@@ -154,6 +159,34 @@ export const useTabsStore = defineStore('tabs', () => {
       await invoke('tabs_create', { id, url })
     }
     await activateTab(id)
+    return id
+  }
+
+  /** Inserts a tab right after the active one (browser-like adjacency) rather
+   * than at the end of the list. Falls back to appending. */
+  function insertAfterActive(tab: Tab): void {
+    const idx = tabs.value.findIndex((t) => t.id === activeTabId.value)
+    if (idx >= 0) tabs.value.splice(idx + 1, 0, tab)
+    else tabs.value.push(tab)
+  }
+
+  /** A link, `window.open`, or "open in new tab" from page content. Background
+   * tabs get their native webview immediately but are not activated. See
+   * docs/features/new-tab-and-context-menu.md. */
+  async function openFromContent(url: string, background: boolean): Promise<string> {
+    const id = nanoid()
+    const tab: Tab = {
+      id,
+      url,
+      title: url,
+      favicon: faviconFor(url),
+      loading: true,
+      createdAt: Date.now(),
+      pending: false,
+    }
+    insertAfterActive(tab)
+    if (isTauri()) await invoke('tabs_create', { id, url })
+    if (!background) await activateTab(id)
     return id
   }
 
@@ -250,6 +283,7 @@ export const useTabsStore = defineStore('tabs', () => {
     ready,
     restoreSession,
     createTab,
+    openFromContent,
     navigate,
     closeTab,
     activateTab,

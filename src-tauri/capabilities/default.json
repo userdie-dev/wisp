@@ -12,6 +12,15 @@
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-is-maximized",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "dialog:allow-open",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$DOWNLOAD/**" }, { "path": "$HOME/**" }]
+    },
+    {
+      "identifier": "opener:allow-reveal-item-in-dir",
+      "allow": [{ "path": "$DOWNLOAD/**" }, { "path": "$HOME/**" }]
+    }
   ]
 }

@@ -4,6 +4,7 @@ import { useTabsStore } from '@/stores/tabs'
 import { useContentBounds } from '@/composables/useContentBounds'
 import HistoryView from '@/components/history/HistoryView.vue'
 import BookmarksView from '@/components/bookmarks/BookmarksView.vue'
+import DownloadsView from '@/components/downloads/DownloadsView.vue'
 import SettingsView from '@/components/settings/SettingsView.vue'
 import StartPage from '@/components/starttab/StartPage.vue'
 
@@ -22,6 +23,7 @@ const chromeRendered = computed(() => !!tabs.activeInternalPage || !!activeTab.v
   <div ref="el" class="min-h-0 flex-1" :class="chromeRendered ? 'bg-surface' : 'bg-transparent'">
     <HistoryView v-if="tabs.activeInternalPage === 'history'" />
     <BookmarksView v-else-if="tabs.activeInternalPage === 'bookmarks'" />
+    <DownloadsView v-else-if="tabs.activeInternalPage === 'downloads'" />
     <SettingsView v-else-if="tabs.activeInternalPage === 'settings'" />
     <StartPage v-else-if="activeTab?.pending" />
     <!-- Otherwise: intentionally empty — the active tab's child webview is

@@ -19,6 +19,8 @@
   - [features/navigation-state.md](./features/navigation-state.md) — блокировка кнопок назад/вперёд, спиннер загрузки, Stop
   - [features/favicons.md](./features/favicons.md) — иконки сайтов у вкладок
   - [features/keyboard-shortcuts.md](./features/keyboard-shortcuts.md) — горячие клавиши
+  - [features/new-tab-and-context-menu.md](./features/new-tab-and-context-menu.md) — ссылки в новых вкладках, контекстное меню
+  - [features/downloads.md](./features/downloads.md) — менеджер загрузок
 
 ## Статус
 

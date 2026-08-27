@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use tauri::{AppHandle, Manager, State};
 
 use crate::webview_manager::{ContentBounds, TabCreated, TabRegistry};
@@ -103,6 +105,20 @@ pub async fn show_internal_page(
     registry: State<'_, TabRegistry>,
 ) -> Result<(), String> {
     to_string_err(registry.show_internal_page(&app))
+}
+
+/// Effective download directory (override, else OS "Downloads"). Shown on the
+/// Downloads page — see docs/features/downloads.md.
+#[tauri::command]
+pub fn downloads_dir(app: AppHandle, registry: State<'_, TabRegistry>) -> String {
+    registry.downloads_dir(&app)
+}
+
+/// `null` resets to the OS "Downloads" folder. Persisted on the frontend and
+/// re-applied on startup.
+#[tauri::command]
+pub fn downloads_set_dir(path: Option<String>, registry: State<'_, TabRegistry>) {
+    registry.set_downloads_dir(path.map(PathBuf::from));
 }
 
 /// Reported by a ResizeObserver on the frontend's content placeholder element

@@ -8,9 +8,11 @@ import WindowControls from '@/components/chrome/WindowControls.vue'
 import UpdateBanner from '@/components/chrome/UpdateBanner.vue'
 import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
+import { useDownloadsStore } from '@/stores/downloads'
 import { useSettingsStore } from '@/stores/settings'
 import { useUpdaterStore } from '@/stores/updater'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useContentBridge } from '@/composables/useContentBridge'
 import { isTauri } from '@/lib/tauri-env'
 
 const tabs = useTabsStore()
@@ -21,16 +23,31 @@ const updater = useUpdaterStore()
 // — see docs/features/keyboard-shortcuts.md.
 useKeyboardShortcuts()
 
-// Eagerly instantiate the history store so its `tab-updated` subscription is
-// active for the whole session — otherwise nothing records visits until the
-// user first opens the History page (the only other place it's used).
+// Native context-menu action events from content webviews — see
+// docs/features/new-tab-and-context-menu.md.
+useContentBridge()
+
+// Eagerly instantiate the history and downloads stores so their Rust-event
+// subscriptions are active for the whole session, not just once their page is
+// first opened.
 useHistoryStore()
+useDownloadsStore()
 
 onMounted(async () => {
   // Restore last session's tabs if enabled, then fall back to one empty tab —
   // see docs/features/session-restore.md.
   await tabs.restoreSession()
   if (tabs.tabs.length === 0) tabs.createTab()
+
+  // Re-apply the saved download directory to the Rust side — see
+  // docs/features/downloads.md.
+  if (isTauri()) {
+    await settings.loaded
+    if (settings.downloadsDir) {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('downloads_set_dir', { path: settings.downloadsDir })
+    }
+  }
 
   // Auto-check for updates if enabled — see docs/features/auto-update.md.
   // Delayed so it doesn't compete with the first paint / initial tab creation,
