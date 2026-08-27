@@ -12,6 +12,9 @@
   - [features/bookmarks.md](./features/bookmarks.md) — закладки
   - [features/theme-settings.md](./features/theme-settings.md) — настройка темы
   - [features/search-settings.md](./features/search-settings.md) — настройка поисковой системы
+- Следующие этапы:
+  - [features/roadmap.md](./features/roadmap.md) — список кандидатов на реализацию
+  - [features/auto-update.md](./features/auto-update.md) — автообновление через GitHub Releases
 
 ## Статус
 

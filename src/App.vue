@@ -5,12 +5,16 @@ import Sidebar from '@/components/sidebar/Sidebar.vue'
 import Toolbar from '@/components/chrome/Toolbar.vue'
 import ContentHost from '@/components/chrome/ContentHost.vue'
 import WindowControls from '@/components/chrome/WindowControls.vue'
+import UpdateBanner from '@/components/chrome/UpdateBanner.vue'
 import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
 import { useSettingsStore } from '@/stores/settings'
+import { useUpdaterStore } from '@/stores/updater'
+import { isTauri } from '@/lib/tauri-env'
 
 const tabs = useTabsStore()
 const settings = useSettingsStore()
+const updater = useUpdaterStore()
 
 // Eagerly instantiate the history store so its `tab-updated` subscription is
 // active for the whole session — otherwise nothing records visits until the
@@ -19,6 +23,15 @@ useHistoryStore()
 
 onMounted(() => {
   if (tabs.tabs.length === 0) tabs.createTab()
+
+  // Auto-check for updates if enabled — see docs/features/auto-update.md.
+  // Delayed so it doesn't compete with the first paint / initial tab creation,
+  // and so the persisted `updatesAutoCheck` setting has loaded by then.
+  if (isTauri()) {
+    setTimeout(() => {
+      if (settings.updatesAutoCheck) updater.check({ silent: true })
+    }, 3000)
+  }
 })
 </script>
 
@@ -51,6 +64,7 @@ onMounted(() => {
         </div>
         <WindowControls />
       </div>
+      <UpdateBanner />
       <ContentHost />
     </div>
   </div>

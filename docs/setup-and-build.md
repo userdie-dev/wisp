@@ -38,6 +38,8 @@ git push origin v0.1.0
 
 Это единственный способ получить **версионные** установочные файлы — сборка **runs on GitHub, never locally**. Для сборки под текущий `main` без тега смотри GitHub Release с тегом `nightly` — он обновляется автоматически при каждом push.
 
+Релиз создаётся как **draft** — его нужно опубликовать вручную в GitHub. Пока он draft, автообновление (endpoint `/releases/latest/download/latest.json`) его не видит — см. [features/auto-update.md](./features/auto-update.md). Для работы автообновления также должны быть заданы секреты `TAURI_SIGNING_PRIVATE_KEY` и `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (иначе `latest.json` не генерируется).
+
 ## Проверка на PR / push
 
 Job `check` гоняет на каждый `push` и pull request:

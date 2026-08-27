@@ -37,6 +37,10 @@ fn apply_window_effects(window: &tauri::WebviewWindow) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
+        // Auto-update from GitHub Releases — see docs/features/auto-update.md.
+        // `process` is needed for the post-install relaunch.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(TabRegistry::default())
         .invoke_handler(tauri::generate_handler![
             commands::tabs_create,

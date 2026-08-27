@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
+import { createRequire } from 'node:module'
+
+const { version } = createRequire(import.meta.url)('./package.json')
 
 // Tauri needs a fixed, predictable port; fails the build instead of picking
 // another one so the Tauri dev-server config never silently drifts.
@@ -19,6 +22,11 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  define: {
+    // Lets the updater store show a real "current version" during `pnpm dev`,
+    // where the Tauri app API is unavailable — see src/stores/updater.ts.
+    __APP_VERSION__: JSON.stringify(version),
   },
   clearScreen: false,
   server: {

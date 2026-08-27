@@ -15,6 +15,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const searchEngineId = ref<string>('google')
   const customSearchEngines = ref<SearchEngine[]>([])
   const sidebarCollapsed = ref(false)
+  const updatesAutoCheck = ref(true)
   const ready = ref(false)
 
   const systemPrefersDark = ref(
@@ -32,6 +33,7 @@ export const useSettingsStore = defineStore('settings', () => {
     searchEngineId.value = (await store.get<string>('searchEngineId')) ?? 'google'
     customSearchEngines.value = (await store.get<SearchEngine[]>('customSearchEngines')) ?? []
     sidebarCollapsed.value = (await store.get<boolean>('sidebarCollapsed')) ?? false
+    updatesAutoCheck.value = (await store.get<boolean>('updatesAutoCheck')) ?? true
     ready.value = true
   }
   load()
@@ -55,6 +57,10 @@ export const useSettingsStore = defineStore('settings', () => {
   watch(sidebarCollapsed, async (value) => {
     if (!ready.value) return
     ;(await settingsStore()).set('sidebarCollapsed', value)
+  })
+  watch(updatesAutoCheck, async (value) => {
+    if (!ready.value) return
+    ;(await settingsStore()).set('updatesAutoCheck', value)
   })
 
   watchEffect(() => {
@@ -86,6 +92,7 @@ export const useSettingsStore = defineStore('settings', () => {
     searchEngineId,
     customSearchEngines,
     sidebarCollapsed,
+    updatesAutoCheck,
     toggleSidebar,
     allSearchEngines,
     activeSearchEngine,
