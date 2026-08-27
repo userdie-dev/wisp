@@ -36,7 +36,10 @@ function closeWindow() {
 </script>
 
 <template>
-  <div class="flex h-12 shrink-0 items-center gap-0.5 bg-surface-chrome/60 pl-2 pr-2 backdrop-blur-xl">
+  <div
+    data-tauri-drag-region
+    class="flex h-12 shrink-0 items-center gap-0.5 bg-surface-chrome/60 pl-2 pr-2 backdrop-blur-xl"
+  >
     <button class="rounded p-1.5 hover:bg-fg/10" title="Свернуть" aria-label="Свернуть" @click="minimize">
       <Minus :size="16" />
     </button>
