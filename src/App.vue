@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { PanelLeftOpen } from '@lucide/vue'
 import Sidebar from '@/components/sidebar/Sidebar.vue'
 import Toolbar from '@/components/chrome/Toolbar.vue'
 import ContentHost from '@/components/chrome/ContentHost.vue'
 import WindowControls from '@/components/chrome/WindowControls.vue'
 import { useTabsStore } from '@/stores/tabs'
 import { useHistoryStore } from '@/stores/history'
+import { useSettingsStore } from '@/stores/settings'
 
 const tabs = useTabsStore()
+const settings = useSettingsStore()
 
 // Eagerly instantiate the history store so its `tab-updated` subscription is
 // active for the whole session — otherwise nothing records visits until the
@@ -24,8 +27,27 @@ onMounted(() => {
     <Sidebar />
     <div class="flex min-w-0 flex-1 flex-col">
       <div class="flex h-12 shrink-0">
-        <div data-tauri-drag-region class="min-w-0 flex-1">
-          <Toolbar />
+        <div data-tauri-drag-region class="flex min-w-0 flex-1 items-center">
+          <Transition
+            :duration="{ enter: 200, leave: 150 }"
+            enter-active-class="transition duration-200 ease-out"
+            leave-active-class="transition duration-150 ease-in"
+            enter-from-class="-translate-x-2 opacity-0"
+            leave-to-class="-translate-x-2 opacity-0"
+          >
+            <button
+              v-if="settings.sidebarCollapsed"
+              class="ml-2 shrink-0 rounded p-1.5 hover:bg-fg/10"
+              aria-label="Развернуть боковое меню"
+              title="Развернуть боковое меню"
+              @click="settings.toggleSidebar()"
+            >
+              <PanelLeftOpen :size="16" />
+            </button>
+          </Transition>
+          <div class="min-w-0 flex-1">
+            <Toolbar />
+          </div>
         </div>
         <WindowControls />
       </div>

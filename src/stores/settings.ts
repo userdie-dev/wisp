@@ -14,6 +14,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const theme = ref<Theme>('system')
   const searchEngineId = ref<string>('google')
   const customSearchEngines = ref<SearchEngine[]>([])
+  const sidebarCollapsed = ref(false)
   const ready = ref(false)
 
   const systemPrefersDark = ref(
@@ -30,6 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
     theme.value = (await store.get<Theme>('theme')) ?? 'system'
     searchEngineId.value = (await store.get<string>('searchEngineId')) ?? 'google'
     customSearchEngines.value = (await store.get<SearchEngine[]>('customSearchEngines')) ?? []
+    sidebarCollapsed.value = (await store.get<boolean>('sidebarCollapsed')) ?? false
     ready.value = true
   }
   load()
@@ -49,6 +51,10 @@ export const useSettingsStore = defineStore('settings', () => {
   watch(searchEngineId, async (value) => {
     if (!ready.value) return
     ;(await settingsStore()).set('searchEngineId', value)
+  })
+  watch(sidebarCollapsed, async (value) => {
+    if (!ready.value) return
+    ;(await settingsStore()).set('sidebarCollapsed', value)
   })
 
   watchEffect(() => {
@@ -71,10 +77,16 @@ export const useSettingsStore = defineStore('settings', () => {
     if (searchEngineId.value === id) searchEngineId.value = 'google'
   }
 
+  function toggleSidebar() {
+    sidebarCollapsed.value = !sidebarCollapsed.value
+  }
+
   return {
     theme,
     searchEngineId,
     customSearchEngines,
+    sidebarCollapsed,
+    toggleSidebar,
     allSearchEngines,
     activeSearchEngine,
     addCustomSearchEngine,

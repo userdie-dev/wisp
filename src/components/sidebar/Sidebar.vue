@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { Plus, Clock, Star, Settings } from '@lucide/vue'
+import { Plus, Clock, Star, Settings, PanelLeftClose } from '@lucide/vue'
 import { useTabsStore } from '@/stores/tabs'
+import { useSettingsStore } from '@/stores/settings'
 import TabItem from './TabItem.vue'
 
 const tabs = useTabsStore()
+const settings = useSettingsStore()
 
 function newTab() {
   tabs.createTab()
@@ -13,18 +15,29 @@ function newTab() {
 <template>
   <aside
     data-tauri-drag-region
-    class="flex h-full w-[260px] shrink-0 flex-col bg-surface-chrome pt-8 backdrop-blur-xl"
+    class="flex h-full w-[260px] shrink-0 flex-col overflow-hidden bg-surface-chrome pt-8 backdrop-blur-xl transition-[margin-left] duration-200 ease-out"
+    :style="{ marginLeft: settings.sidebarCollapsed ? '-260px' : '0px' }"
   >
     <div class="flex items-center justify-between px-3 pb-2">
       <span class="text-xs font-medium text-fg-muted">Вкладки</span>
-      <button
-        class="rounded p-1 hover:bg-fg/10"
-        aria-label="Новая вкладка"
-        title="Новая вкладка (Ctrl+T)"
-        @click="newTab"
-      >
-        <Plus :size="16" />
-      </button>
+      <div class="flex items-center gap-1">
+        <button
+          class="rounded p-1 hover:bg-fg/10"
+          aria-label="Новая вкладка"
+          title="Новая вкладка (Ctrl+T)"
+          @click="newTab"
+        >
+          <Plus :size="16" />
+        </button>
+        <button
+          class="rounded p-1 hover:bg-fg/10"
+          aria-label="Свернуть боковое меню"
+          title="Свернуть боковое меню"
+          @click="settings.toggleSidebar()"
+        >
+          <PanelLeftClose :size="16" />
+        </button>
+      </div>
     </div>
 
     <div class="flex-1 space-y-0.5 overflow-y-auto px-2">
